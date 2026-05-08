@@ -1,0 +1,67 @@
+{
+  "name": "reliable-agent-kit",
+  "version": "0.1.0",
+  "description": "Production-grade building blocks for LLM agents, based on the 12-Factor Agents methodology",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./agent-loop": {
+      "types": "./dist/agent-loop/index.d.ts",
+      "import": "./dist/agent-loop/index.js"
+    },
+    "./thread-state": {
+      "types": "./dist/thread-state/index.d.ts",
+      "import": "./dist/thread-state/index.js"
+    },
+    "./human-in-loop": {
+      "types": "./dist/human-in-loop/index.d.ts",
+      "import": "./dist/human-in-loop/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "node --experimental-vm-modules node_modules/.bin/vitest run",
+    "test:watch": "node --experimental-vm-modules node_modules/.bin/vitest",
+    "lint": "eslint src/",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "agent",
+    "llm",
+    "ai",
+    "12-factor",
+    "human-in-the-loop",
+    "tool-calling",
+    "event-sourcing",
+    "production"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "uuid": "^11.1.0"
+  },
+  "peerDependencies": {
+    "express": ">=4.18.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ]
+}
