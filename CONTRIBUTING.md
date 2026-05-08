@@ -16,7 +16,7 @@ npm install
 |---------|-------------|
 | `npm run build` | Compile TypeScript to `dist/` |
 | `npm run dev` | Watch mode compilation |
-| `npm test` | Run all tests |
+| `npm test` | Run all tests (36 cases) |
 | `npm run test:watch` | Run tests in watch mode |
 | `npm run lint` | Lint source files |
 
@@ -33,13 +33,22 @@ src/
 │   ├── thread.ts            # Thread class
 │   ├── serializer.ts        # JSON / XML / Markdown serialization
 │   └── stores/
+│       ├── index.ts         # Store exports
 │       ├── memory-store.ts  # In-memory (dev/test)
 │       └── file-store.ts    # Filesystem persistence
 └── human-in-loop/           # Human-in-the-loop workflows
-    ├── types.ts             # Approval/Response types
+    ├── types.ts             # Approval/Response/Webhook types
     ├── handler.ts           # createHumanHandler()
-    └── router.ts            # createAgentRouter() (Express)
+    ├── router.ts            # createAgentRouter() (Express)
+    └── index.ts             # Module exports
 ```
+
+## Editing the Skill
+
+The `SKILL.md` file defines how Claude Code scaffolds agents via `/reliable-agent-kit`. When editing:
+- Keep templates in sync with the actual API signatures in `src/`
+- Test the skill by invoking `/reliable-agent-kit` in Claude Code after changes
+- Copy updates to `~/.claude/skills/reliable-agent-kit/SKILL.md` for local testing
 
 ## Pull Request Guidelines
 

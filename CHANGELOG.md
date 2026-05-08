@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **agent-loop** module: core while-loop with tool dispatch, error recovery, lifecycle hooks (`beforeToolExec`, `afterToolExec`, `onError`)
 - **thread-state** module: `Thread` class with event sourcing, JSON/XML/Markdown serialization, `MemoryStore` and `FileStore`
 - **human-in-loop** module: `createHumanHandler()` for approval/response workflows, `createAgentRouter()` for Express HTTP endpoints with webhook support
-- 5 progressive examples (basic loop → calculator → state → approval → full server)
+- **SKILL.md**: Claude Code skill definition with 6 templates (A-F) for scaffolding agents via `/reliable-agent-kit`
+- 5 progressive examples (basic loop, calculator, state persistence, human approval, full server)
 - 36 test cases covering all three modules
 - Full TypeScript type definitions with generics support

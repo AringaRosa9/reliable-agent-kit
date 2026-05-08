@@ -9,6 +9,26 @@ Production-grade building blocks for LLM agents, based on the [12-Factor Agents]
 
 Not a framework — a toolkit. You own every line of your agent's code.
 
+## Two Ways to Use
+
+### Way 1: Claude Code Skill (Recommended)
+
+If you use [Claude Code](https://claude.ai/claude-code), copy `SKILL.md` into `~/.claude/skills/reliable-agent-kit/` and invoke:
+
+```
+/reliable-agent-kit Build a customer support agent with order lookup and refund approval
+```
+
+Claude generates production-ready code for you — no boilerplate to write by hand.
+
+### Way 2: npm Library
+
+```bash
+npm install reliable-agent-kit
+```
+
+Import the modules and build your agent programmatically. See [Quick Start](#quick-start) below.
+
 ## Why
 
 Most agent frameworks get you to 70-80% fast, then block you from reaching production quality. This kit gives you small, composable modules that slot into your existing Node.js application without lock-in.
@@ -23,12 +43,6 @@ Inspired by the insight from 12-Factor Agents: the best production agents are bu
 | `thread-state` | #3 Own Your Context Window, #5 Unify State, #12 Stateless Reducer | Event-sourced Thread, JSON/XML/Markdown serialization, pluggable stores |
 | `human-in-loop` | #6 Launch/Pause/Resume, #7 Contact Humans with Tool Calls | Approval/response workflows, Express router, webhook support |
 
-## Install
-
-```bash
-npm install reliable-agent-kit
-```
-
 ## Quick Start
 
 ### 1. Minimal Agent Loop
@@ -37,26 +51,19 @@ npm install reliable-agent-kit
 import { createAgentLoop, Thread } from "reliable-agent-kit";
 
 const loop = createAgentLoop({
-  // Your LLM call — any provider (OpenAI, Anthropic, local, etc.)
   resolveNextStep: async (context) => {
     const response = await callYourLLM(context);
     return JSON.parse(response); // { intent: "add", a: 1, b: 2 }
   },
-
-  // How to extract the intent from the LLM's output
   getIntent: (step) => step.intent,
-
-  // Your tool implementations
   tools: {
     add: async (step) => step.a + step.b,
     search: async (step) => await db.search(step.query),
   },
-
-  // Intents that pause the loop and return control to you
   pauseIntents: ["done_for_now", "request_clarification"],
 });
 
-const thread = new Thread();
+const thread = new Thread({ serializeFormat: { format: "xml" } });
 thread.addEvent({ type: "user_input", data: "What is 3 + 4?" });
 
 const result = await loop.run(thread);
@@ -71,7 +78,7 @@ import { Thread, MemoryStore } from "reliable-agent-kit";
 
 const store = new MemoryStore();
 
-// Create and persist a thread
+// Create and persist
 const thread = new Thread();
 thread.addEvent({ type: "user_input", data: "Hello" });
 const threadId = store.create(thread.snapshot());
@@ -97,8 +104,8 @@ const store = new FileStore("./data/threads");
 import { createHumanHandler } from "reliable-agent-kit";
 
 const humanHandler = createHumanHandler({
-  approvalIntents: ["deploy", "delete"],       // Need approval before execution
-  responseIntents: ["request_clarification"],   // Need human text response
+  approvalIntents: ["deploy", "delete"],
+  responseIntents: ["request_clarification"],
 
   onContactHuman: async (request) => {
     if (request.type === "approval") {
@@ -143,7 +150,7 @@ const router = createAgentRouter({
   store: new MemoryStore(),
   loop: myAgentLoop,
   humanHandler: myHumanHandler,
-  async: true, // Non-blocking — returns 202 immediately
+  async: true,
   onComplete: async (threadId, thread) => {
     console.log(`Thread ${threadId} completed`);
   },
@@ -173,15 +180,15 @@ Creates the core agent loop.
 |--------|------|---------|-------------|
 | `resolveNextStep` | `(context: string) => Promise<TStep>` | required | Your LLM call |
 | `getIntent` | `(step: TStep) => string` | required | Extract intent from step |
-| `tools` | `Record<string, ToolHandler>` | required | Intent → handler map |
+| `tools` | `Record<string, ToolHandler>` | required | Intent -> handler map |
 | `pauseIntents` | `string[]` | required | Intents that pause the loop |
 | `maxIterations` | `number` | `50` | Safety limit |
 | `maxConsecutiveErrors` | `number` | `3` | Error threshold before stop |
-| `onError` | `(err, count, thread) => action` | — | Custom error handling |
-| `beforeToolExec` | `(intent, step, thread) => boolean` | — | Pre-execution hook |
+| `onError` | `(err, count, thread) => action` | — | Custom error handling (`"continue"` / `"pause"` / `"abort"`) |
+| `beforeToolExec` | `(intent, step, thread) => boolean` | — | Pre-execution hook, return `false` to skip |
 | `afterToolExec` | `(intent, result, thread) => void` | — | Post-execution hook |
 
-Returns `AgentLoop` with a `.run(thread)` method that returns `AgentLoopResult`:
+Returns `AgentLoop` with a `.run(thread)` method that returns:
 
 ```typescript
 interface AgentLoopResult {
@@ -224,10 +231,10 @@ Thread.fromSnapshot(snapshot, opts); // Restore from snapshot
 ### Serialization Formats
 
 ```typescript
-// JSON (default) — verbose but debuggable
+// JSON — verbose but debuggable
 thread.serialize({ format: "json", pretty: true });
 
-// XML — ~40% fewer tokens, good for LLM context
+// XML (recommended) — ~40% fewer tokens, good for LLM context
 // <user_input>hi</user_input>
 // <add>
 //   a: 1
@@ -266,10 +273,10 @@ Creates handlers for human-in-the-loop workflows.
 
 | Option | Type | Description |
 |--------|------|-------------|
-| `approvalIntents` | `string[]` | Intents requiring human approval |
+| `approvalIntents` | `string[]` | Intents requiring human approval before execution |
 | `responseIntents` | `string[]` | Intents expecting human text response |
-| `onContactHuman` | `(request) => Promise<void>` | Notification callback |
-| `formatForHuman` | `(intent, step) => string` | Format step for humans |
+| `onContactHuman` | `(request: HumanContactRequest) => Promise<void>` | Notification callback (Slack, email, etc.) |
+| `formatForHuman` | `(intent: string, step: any) => string` | Format step for humans (optional) |
 
 ### `createAgentRouter(config)`
 
@@ -278,48 +285,66 @@ Creates an Express Router with full agent lifecycle endpoints.
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `store` | `ThreadStore` | required | Where to persist threads |
-| `loop` | `AgentLoop` | required | The agent loop |
+| `loop` | `AgentLoop` | required | The agent loop instance |
 | `humanHandler` | `HumanHandler` | required | Human interaction handler |
-| `async` | `boolean` | `false` | Non-blocking mode |
+| `threadOptions` | `ThreadConstructorOptions` | — | Options passed when creating new Thread instances |
+| `async` | `boolean` | `false` | Non-blocking mode (returns 202 immediately) |
 | `onComplete` | `(id, thread) => Promise<void>` | — | Completion callback |
 
 ## Architecture
 
 ```
 User Input
-    │
-    ▼
-┌─────────────────────────────────────────┐
-│  Agent Loop (while loop)                │
-│  ┌───────────────────────────────────┐  │
-│  │ 1. Serialize thread → context     │  │
-│  │ 2. Call LLM → structured step     │  │
-│  │ 3. Append tool_call event         │  │
-│  │ 4. Check: pause intent? → RETURN  │  │
-│  │ 5. Execute tool handler           │  │
-│  │ 6. Append tool_response event     │  │
-│  │ 7. Loop back to 1                 │  │
-│  └───────────────────────────────────┘  │
-└──────────────┬──────────────────────────┘
-               │ paused
-               ▼
-┌──────────────────────────────┐
-│  Human Handler               │
-│  - Format request for human  │
-│  - Send notification         │
-│  - Wait for response         │
-│  - Apply to thread           │
-│  - Resume loop               │
-└──────────────────────────────┘
-               │
-               ▼
-┌──────────────────────────────┐
-│  Thread Store                │
-│  - Persist snapshots         │
-│  - Restore on resume         │
-│  - Memory / File / Custom    │
-└──────────────────────────────┘
+    |
+    v
++------------------------------------------+
+|  Agent Loop (while loop)                 |
+|  +------------------------------------+  |
+|  | 1. Serialize thread -> context     |  |
+|  | 2. Call LLM -> structured step     |  |
+|  | 3. Append tool_call event          |  |
+|  | 4. Check: pause intent? -> RETURN  |  |
+|  | 5. Execute tool handler            |  |
+|  | 6. Append tool_response event      |  |
+|  | 7. Loop back to 1                  |  |
+|  +------------------------------------+  |
++------------------+-----------------------+
+                   | paused
+                   v
++-------------------------------+
+|  Human Handler                |
+|  - Format request for human   |
+|  - Send notification          |
+|  - Wait for response          |
+|  - Apply to thread            |
+|  - Resume loop                |
++-------------------------------+
+                   |
+                   v
++-------------------------------+
+|  Thread Store                 |
+|  - Persist snapshots          |
+|  - Restore on resume          |
+|  - Memory / File / Custom     |
++-------------------------------+
 ```
+
+## Claude Code Skill
+
+This project includes a `SKILL.md` that integrates with [Claude Code](https://claude.ai/claude-code). Install it:
+
+```bash
+mkdir -p ~/.claude/skills/reliable-agent-kit
+cp SKILL.md ~/.claude/skills/reliable-agent-kit/
+```
+
+Then invoke in Claude Code:
+
+```
+/reliable-agent-kit Build an agent that searches a database and needs approval for deletions
+```
+
+The skill provides 6 templates (A-F) covering basic loops, state persistence, human approval, HTTP servers, full production setups, and context serialization optimization.
 
 ## Examples
 
@@ -328,7 +353,7 @@ See the [`examples/`](./examples) directory for runnable code:
 | File | What it shows |
 |------|---------------|
 | `01-basic-loop.ts` | Minimal agent loop with mock LLM |
-| `02-calculator.ts` | Multi-step tool execution, XML vs JSON |
+| `02-calculator.ts` | Multi-step tool execution, XML vs JSON serialization |
 | `03-with-state.ts` | Pause/resume with MemoryStore |
 | `04-human-approval.ts` | Full approval lifecycle |
 | `05-full-server.ts` | Complete Express server with webhooks |
@@ -338,38 +363,31 @@ See the [`examples/`](./examples) directory for runnable code:
 ```
 reliable-agent-kit/
 ├── src/
-│   ├── index.ts                     # Public API — all exports
-│   ├── agent-loop/
-│   │   ├── types.ts                 # AgentLoopConfig, AgentLoopResult, ToolHandler
-│   │   └── index.ts                 # createAgentLoop()
-│   ├── thread-state/
-│   │   ├── types.ts                 # ThreadEvent, ThreadStore, ThreadSnapshot
-│   │   ├── thread.ts                # Thread class (event sourcing, fork, serialize)
-│   │   ├── serializer.ts            # JSON / XML / Markdown serialization
-│   │   └── stores/
-│   │       ├── index.ts             # Store exports
-│   │       ├── memory-store.ts      # In-memory store (dev/test)
-│   │       └── file-store.ts        # Filesystem store (simple persistence)
-│   └── human-in-loop/
-│       ├── types.ts                 # Approval/Response/Webhook types
-│       ├── handler.ts               # createHumanHandler()
-│       ├── router.ts                # createAgentRouter() — Express endpoints
-│       └── index.ts                 # Module exports
-├── examples/
-│   ├── 01-basic-loop.ts             # Minimal agent loop
-│   ├── 02-calculator.ts             # Multi-step tools + serialization
-│   ├── 03-with-state.ts             # Pause/resume with persistence
-│   ├── 04-human-approval.ts         # Approval lifecycle
-│   └── 05-full-server.ts            # Complete Express server + webhooks
-├── tests/
-│   ├── agent-loop.test.ts           # 9 tests
-│   ├── thread-state.test.ts         # 18 tests
-│   └── human-in-loop.test.ts        # 9 tests
+|   ├── index.ts                     # Public API — all exports
+|   ├── agent-loop/
+|   |   ├── types.ts                 # AgentLoopConfig, AgentLoopResult, ToolHandler
+|   |   └── index.ts                 # createAgentLoop()
+|   ├── thread-state/
+|   |   ├── types.ts                 # ThreadEvent, ThreadStore, ThreadSnapshot
+|   |   ├── thread.ts                # Thread class (event sourcing, fork, serialize)
+|   |   ├── serializer.ts            # JSON / XML / Markdown serialization
+|   |   └── stores/
+|   |       ├── index.ts             # Store exports
+|   |       ├── memory-store.ts      # In-memory store (dev/test)
+|   |       └── file-store.ts        # Filesystem store (simple persistence)
+|   └── human-in-loop/
+|       ├── types.ts                 # Approval/Response/Webhook types
+|       ├── handler.ts               # createHumanHandler()
+|       ├── router.ts                # createAgentRouter() — Express endpoints
+|       └── index.ts                 # Module exports
+├── examples/                        # 5 progressive examples
+├── tests/                           # 36 tests (vitest)
+├── SKILL.md                         # Claude Code skill definition
 ├── package.json
 ├── tsconfig.json
 ├── vitest.config.ts
 ├── .gitignore
-├── LICENSE                          # MIT
+├── LICENSE
 ├── CONTRIBUTING.md
 ├── CHANGELOG.md
 └── README.md
